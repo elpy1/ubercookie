@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# uv
+uv.lock.tmp
+
+# Node
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# Runtime data (the tracking observation log lives here)
+backend/data/
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local agent/tool state
+.agents/
+.claude/
+.codex/
