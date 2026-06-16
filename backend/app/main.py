@@ -26,6 +26,13 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config, ids, store
 
+API_CDN_NO_STORE_HEADERS = {
+    "CDN-Cache-Control": "no-store",
+    "Cloudflare-CDN-Cache-Control": "no-store",
+}
+BROWSER_REVALIDATE_CACHE = "private, no-cache"
+BROWSER_LONG_CACHE = "private, max-age=31536000, immutable"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,6 +60,19 @@ if config.CORS_ORIGINS:
         allow_headers=["*"],
         expose_headers=["ETag"],
     )
+
+
+@app.middleware("http")
+async def api_cache_policy(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+        response.headers.setdefault("CDN-Cache-Control", API_CDN_NO_STORE_HEADERS["CDN-Cache-Control"])
+        response.headers.setdefault(
+            "Cloudflare-CDN-Cache-Control",
+            API_CDN_NO_STORE_HEADERS["Cloudflare-CDN-Cache-Control"],
+        )
+    return response
 
 
 def _set_tracking_cookie(resp: Response, value: str) -> None:
@@ -98,7 +118,8 @@ def etag_id(request: Request) -> Response:
     headers = {
         # "no-cache" = the browser MAY store this but must revalidate before
         # reuse, which is exactly what makes it send If-None-Match every time.
-        "Cache-Control": "no-cache",
+        # "private" keeps shared caches/CDNs out of this per-browser vector.
+        "Cache-Control": BROWSER_REVALIDATE_CACHE,
     }
     if stamped:
         headers["ETag"] = f'"{stamped}"'
@@ -127,7 +148,7 @@ def lastmod_id(request: Request) -> Response:
     requested = ids.coerce(request.headers.get(config.SET_HEADER))
     stamped = requested or recovered
 
-    headers = {"Cache-Control": "no-cache"}
+    headers = {"Cache-Control": BROWSER_REVALIDATE_CACHE}
     if stamped:
         headers["Last-Modified"] = formatdate(store.lastmod_token(stamped), usegmt=True)
     return JSONResponse({"recovered": recovered, "stamped": stamped}, headers=headers)
@@ -147,7 +168,7 @@ def cache_id_js(request: Request) -> Response:
         return Response(
             content=body,
             media_type="application/javascript",
-            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+            headers={"Cache-Control": BROWSER_LONG_CACHE},
         )
     # Cold/read path with no id supplied: hand back an uncacheable stub so we
     # never poison the cache with a value the client did not choose.

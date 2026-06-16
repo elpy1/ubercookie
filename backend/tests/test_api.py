@@ -47,7 +47,8 @@ def test_etag_supercookie_round_trip():
     # Write: stamp an id into the ETag via the set-header.
     w = client.get("/api/etag-id", headers={config.SET_HEADER: HEX})
     assert w.headers["etag"] == f'"{HEX}"'
-    assert w.headers["cache-control"] == "no-cache"
+    assert w.headers["cache-control"] == "private, no-cache"
+    assert w.headers["cloudflare-cdn-cache-control"] == "no-store"
     assert w.json()["stamped"] == HEX
 
     # Read: the browser would echo the stored ETag — we simulate that header.
@@ -62,13 +63,16 @@ def test_etag_ignores_garbage_validator():
 
 def test_cache_id_js_embeds_id_when_set():
     r = client.get("/api/cache-id.js", headers={config.SET_HEADER: HEX2})
+    assert r.headers["cache-control"].startswith("private")
     assert "immutable" in r.headers["cache-control"]
+    assert r.headers["cloudflare-cdn-cache-control"] == "no-store"
     assert f'"{HEX2}"' in r.text
 
 
 def test_cache_id_js_is_uncacheable_without_id():
     r = client.get("/api/cache-id.js")
     assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cloudflare-cdn-cache-control"] == "no-store"
     assert "null" in r.text
 
 
@@ -101,7 +105,8 @@ def test_last_modified_round_trip():
     # Write: stamp a Last-Modified date encoding HEX.
     w = client.get("/api/lastmod-id", headers={config.SET_HEADER: HEX})
     assert "last-modified" in w.headers
-    assert w.headers["cache-control"] == "no-cache"
+    assert w.headers["cache-control"] == "private, no-cache"
+    assert w.headers["cloudflare-cdn-cache-control"] == "no-store"
     assert w.json()["stamped"] == HEX
 
     # Read: the browser would echo the date via If-Modified-Since.

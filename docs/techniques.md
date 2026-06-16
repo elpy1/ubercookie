@@ -97,7 +97,7 @@ under storage pressure. Users can still clear it manually.
 
 ### HTTP cache supercookie (embedded-id resource) — implemented
 - **Mechanism**: `/api/cache-id.js` returns JavaScript with the id baked into the
-  body and `Cache-Control: public, max-age=31536000, immutable`.
+  body and `Cache-Control: private, max-age=31536000, immutable`.
 - **Tracking use**: the browser keeps serving the old cached file, including the
   old id, until cached files are cleared.
 - **Mitigations**: clear cached files; cache partitioning limits cross-site
