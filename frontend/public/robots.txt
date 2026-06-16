@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /__sw_ubercookie_id
+Disallow: /__ubercookie_cacheapi_id
+
+Sitemap: https://ubercookie.xyz/sitemap.xml
