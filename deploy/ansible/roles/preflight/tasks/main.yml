@@ -1,0 +1,21 @@
+---
+- name: Require a Red Hat compatible host
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "RedHat"
+      - ansible_distribution_major_version | int >= 9
+    fail_msg: "This deployment is written for Rocky/RHEL/AlmaLinux 9 or newer."
+
+- name: Require Cloudflare CIDR data
+  ansible.builtin.assert:
+    that:
+      - cloudflare_ipv4_cidrs | length > 0
+      - not ubercookie_cloudflare_ipv6_enabled | bool or cloudflare_ipv6_cidrs | length > 0
+    fail_msg: "Cloudflare IP range fetch failed; refusing to configure open web ingress."
+
+- name: Show target runtime summary
+  ansible.builtin.debug:
+    msg:
+      - "Target: {{ inventory_hostname }} ({{ ansible_distribution }} {{ ansible_distribution_version }})"
+      - "Memory: {{ ansible_memtotal_mb }} MB"
+      - "Domain: {{ ubercookie_server_names | join(', ') }}"

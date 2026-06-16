@@ -1,0 +1,127 @@
+---
+- name: Create nginx modular directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/nginx/sites-available
+    - /etc/nginx/sites-enabled
+    - /etc/nginx/snippets
+
+- name: Install Cloudflare real IP config
+  ansible.builtin.template:
+    src: cloudflare-real-ip.conf.j2
+    dest: /etc/nginx/conf.d/cloudflare-real-ip.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Install Cloudflare edge detection map
+  ansible.builtin.template:
+    src: cloudflare-geo.conf.j2
+    dest: /etc/nginx/conf.d/cloudflare-geo.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Install Cloudflare-only gate snippet
+  ansible.builtin.template:
+    src: cloudflare-only.conf.j2
+    dest: /etc/nginx/snippets/cloudflare-only.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Install Cloudflare-aware log format
+  ansible.builtin.template:
+    src: log-format-cloudflare.conf.j2
+    dest: /etc/nginx/conf.d/log-format-cloudflare.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Install TLS parameters
+  ansible.builtin.template:
+    src: ssl-params.conf.j2
+    dest: /etc/nginx/snippets/ssl-params.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Install proxy header snippet
+  ansible.builtin.template:
+    src: proxy-headers.conf.j2
+    dest: /etc/nginx/snippets/ubercookie-proxy-headers.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Install sites-enabled include
+  ansible.builtin.copy:
+    dest: /etc/nginx/conf.d/sites-enabled.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      include /etc/nginx/sites-enabled/*.conf;
+  notify: Reload nginx
+
+- name: Install ubercookie vhost
+  ansible.builtin.template:
+    src: ubercookie.conf.j2
+    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable ubercookie vhost
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}.conf"
+    state: link
+    owner: root
+    group: root
+  notify: Reload nginx
+
+- name: Check nginx proxy SELinux boolean
+  ansible.builtin.command:
+    argv:
+      - getsebool
+      - httpd_can_network_connect
+  when: ansible_selinux.status | default("disabled") == "enabled"
+  changed_when: false
+  register: getsebool_proxy
+
+- name: Allow nginx to proxy to the local app under SELinux
+  ansible.builtin.command:
+    argv:
+      - setsebool
+      - -P
+      - httpd_can_network_connect
+      - "1"
+  when:
+    - ansible_selinux.status | default("disabled") == "enabled"
+    - "'--> on' not in getsebool_proxy.stdout"
+
+- name: Validate nginx configuration
+  ansible.builtin.command:
+    argv:
+      - nginx
+      - -t
+  changed_when: false
+
+- name: Enable and start nginx
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started

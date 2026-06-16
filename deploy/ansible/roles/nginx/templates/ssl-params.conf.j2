@@ -1,0 +1,10 @@
+# Managed by Ansible.
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers off;
+ssl_session_cache shared:SSL:10m;
+ssl_session_timeout 1d;
+ssl_session_tickets off;
+
+{% if nginx_hsts_max_age | int > 0 %}
+add_header Strict-Transport-Security "max-age={{ nginx_hsts_max_age }}{% if nginx_hsts_include_subdomains | bool %}; includeSubDomains{% endif %}" always;
+{% endif %}

@@ -32,3 +32,6 @@ backend/data/
 .agents/
 .claude/
 .codex/
+
+# Deployment secrets
+deploy/ansible/inventory/group_vars/all/vault.yml

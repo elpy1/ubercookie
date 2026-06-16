@@ -1,0 +1,72 @@
+---
+ubercookie_domain: ubercookie.xyz
+ubercookie_canonical_host: ubercookie.xyz
+ubercookie_server_names:
+  - ubercookie.xyz
+  - www.ubercookie.xyz
+ubercookie_redirect_hosts: "{{ ubercookie_server_names | difference([ubercookie_canonical_host]) }}"
+ubercookie_certificate_domains: "{{ ubercookie_server_names }}"
+ubercookie_cloudflare_ipv6_enabled: false
+
+# Set these in deploy/ansible/inventory/group_vars/all/vault.yml, with
+# --extra-vars, or through matching environment variables on the control host.
+letsencrypt_email: "{{ lookup('env', 'LETSENCRYPT_EMAIL') | default('', true) }}"
+cloudflare_api_token: "{{ lookup('env', 'CF_API_TOKEN') | default('', true) }}"
+
+ubercookie_run_user: ubercookie
+ubercookie_run_group: ubercookie
+ubercookie_base_dir: /opt/ubercookie
+ubercookie_app_dir: /opt/ubercookie/app
+ubercookie_venv_dir: /opt/ubercookie/venv
+ubercookie_data_dir: /var/lib/ubercookie
+ubercookie_config_dir: /etc/ubercookie
+ubercookie_env_file: /etc/ubercookie/ubercookie.env
+ubercookie_local_repo: "{{ playbook_dir }}/../../.."
+ubercookie_rsync_target: "{{ ansible_user | default('root') }}@{{ ansible_host | default(inventory_hostname) }}"
+
+ubercookie_python_bin: /usr/bin/python3.11
+ubercookie_backend_python_packages:
+  - "fastapi>=0.110"
+  - "uvicorn[standard]>=0.29"
+ubercookie_nodejs_stream: "20"
+
+ubercookie_bind_host: 127.0.0.1
+ubercookie_bind_port: 8000
+ubercookie_cookie_name: gid
+ubercookie_cookie_secure: "1"
+ubercookie_cookie_max_age: 31536000
+ubercookie_frontend_dist: "{{ ubercookie_app_dir }}/frontend/dist"
+
+certbot_venv_dir: /opt/certbot-cloudflare
+certbot_cloudflare_credentials: /etc/letsencrypt/cloudflare.ini
+certbot_dns_cloudflare_version: "4.2.0"
+certbot_cloudflare_propagation_seconds: 60
+certbot_renew_script: /usr/local/sbin/ubercookie-certbot-renew
+certbot_renew_unit_name: ubercookie-certbot-renew
+certbot_test_before_issue: false
+
+nginx_site_name: "{{ ubercookie_domain }}"
+nginx_access_log: "/var/log/nginx/{{ ubercookie_domain }}.access.log"
+nginx_error_log: "/var/log/nginx/{{ ubercookie_domain }}.error.log"
+nginx_hsts_max_age: 0
+nginx_hsts_include_subdomains: false
+nginx_html_cache_control: "no-cache"
+nginx_service_worker_cache_control: "no-cache"
+nginx_favicon_cache_control: "public, max-age=86400"
+nginx_static_asset_cache_control: "public, max-age=31536000, immutable"
+nginx_listen_ipv6: "{{ ubercookie_cloudflare_ipv6_enabled }}"
+
+ubercookie_firewall_manage: true
+ubercookie_firewall_cloudflare_only: true
+ubercookie_firewall_use_ipsets: true
+ubercookie_firewall_cloudflare_ipv4_ipset: ubercookie_cloudflare_ipv4
+ubercookie_firewall_cloudflare_ipv6_ipset: ubercookie_cloudflare_ipv6
+ubercookie_firewall_web_ports:
+  - 80
+  - 443
+
+ubercookie_zram_manage: false
+ubercookie_zram_require_on_low_memory: true
+ubercookie_zram_low_memory_mb: 2048
+ubercookie_zram_fraction: "1.0"
+ubercookie_zram_max_size_mb: 8192

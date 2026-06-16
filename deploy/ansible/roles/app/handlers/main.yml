@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart ubercookie
+  ansible.builtin.systemd:
+    name: ubercookie
+    state: restarted
+  when: not ansible_check_mode

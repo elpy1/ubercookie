@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew Let's Encrypt certificate for {{ ubercookie_domain }}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ certbot_renew_script }}
+Nice=5
+PrivateTmp=true

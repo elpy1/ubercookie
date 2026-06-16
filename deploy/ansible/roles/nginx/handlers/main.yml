@@ -1,0 +1,15 @@
+---
+- name: Test nginx config
+  ansible.builtin.command:
+    argv:
+      - nginx
+      - -t
+  changed_when: false
+  listen: Reload nginx
+
+- name: Reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  when: not ansible_check_mode
+  listen: Reload nginx

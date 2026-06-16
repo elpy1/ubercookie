@@ -1,0 +1,53 @@
+---
+- name: Check active swap devices
+  ansible.builtin.command:
+    argv:
+      - swapon
+      - --show=NAME,TYPE,SIZE,USED,PRIO
+      - --noheadings
+  changed_when: false
+  register: zram_swapon
+
+- name: Detect active zram swap
+  ansible.builtin.set_fact:
+    ubercookie_zram_active: "{{ '/dev/zram' in zram_swapon.stdout }}"
+
+- name: Install zram generator when requested
+  ansible.builtin.dnf:
+    name: zram-generator
+    state: present
+  when: ubercookie_zram_manage | bool
+
+- name: Configure zram generator when requested
+  ansible.builtin.copy:
+    dest: /etc/systemd/zram-generator.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [zram0]
+      zram-fraction = {{ ubercookie_zram_fraction }}
+      max-zram-size = {{ ubercookie_zram_max_size_mb }}
+  when: ubercookie_zram_manage | bool
+  register: ubercookie_zram_config
+
+- name: Reload systemd after zram generator changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: ubercookie_zram_config is changed
+
+- name: Require zram on low-memory hosts
+  ansible.builtin.assert:
+    that:
+      - ubercookie_zram_active | bool
+    fail_msg: >-
+      This host has {{ ansible_memtotal_mb }} MB RAM and no active zram swap.
+      Enable zram first, or set ubercookie_zram_manage=true and reboot after
+      the generator config is installed.
+  when:
+    - ubercookie_zram_require_on_low_memory | bool
+    - ansible_memtotal_mb | int < ubercookie_zram_low_memory_mb | int
+
+- name: Report zram state
+  ansible.builtin.debug:
+    msg: "Active zram swap: {{ ubercookie_zram_active }}; swap devices: {{ zram_swapon.stdout_lines | default([]) }}"

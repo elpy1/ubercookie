@@ -1,0 +1,102 @@
+---
+- name: Sync application source from control host
+  ansible.builtin.command:
+    argv:
+      - rsync
+      - -a
+      - --delete
+      - --itemize-changes
+      - --chown=root:root
+      - --exclude=.git/
+      - --exclude=.agents/
+      - --exclude=.codex/
+      - --exclude=.claude/
+      - --exclude=backend/.venv/
+      - --exclude=backend/data/
+      - --exclude=frontend/node_modules/
+      - --exclude=frontend/dist/
+      - --exclude=__pycache__/
+      - --exclude=*.pyc
+      - "{{ ubercookie_local_repo }}/"
+      - "{{ ubercookie_rsync_target }}:{{ ubercookie_app_dir }}/"
+  delegate_to: localhost
+  become: false
+  register: ubercookie_rsync
+  changed_when: ubercookie_rsync.stdout | trim | length > 0
+  notify: Restart ubercookie
+
+- name: Create backend virtual environment
+  ansible.builtin.command:
+    argv:
+      - "{{ ubercookie_python_bin }}"
+      - -m
+      - venv
+      - "{{ ubercookie_venv_dir }}"
+    creates: "{{ ubercookie_venv_dir }}/bin/python"
+
+- name: Install backend Python packages
+  ansible.builtin.pip:
+    executable: "{{ ubercookie_venv_dir }}/bin/pip"
+    name: "{{ ubercookie_backend_python_packages }}"
+    state: present
+  notify: Restart ubercookie
+
+- name: Install frontend dependencies
+  ansible.builtin.command:
+    argv:
+      - npm
+      - ci
+    chdir: "{{ ubercookie_app_dir }}/frontend"
+  environment:
+    npm_config_audit: "false"
+    npm_config_fund: "false"
+  register: npm_ci
+  changed_when: "'added' in npm_ci.stdout or 'removed' in npm_ci.stdout or 'changed' in npm_ci.stdout"
+
+- name: Build frontend
+  ansible.builtin.command:
+    argv:
+      - npm
+      - run
+      - build
+    chdir: "{{ ubercookie_app_dir }}/frontend"
+  changed_when: true
+
+- name: Install application environment file
+  ansible.builtin.template:
+    src: ubercookie.env.j2
+    dest: "{{ ubercookie_env_file }}"
+    owner: root
+    group: "{{ ubercookie_run_group }}"
+    mode: "0640"
+  notify: Restart ubercookie
+
+- name: Install systemd service
+  ansible.builtin.template:
+    src: ubercookie.service.j2
+    dest: /etc/systemd/system/ubercookie.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart ubercookie
+
+- name: Flush app handlers before health check
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start ubercookie
+  ansible.builtin.systemd:
+    name: ubercookie
+    enabled: true
+    state: started
+
+- name: Check local application health
+  ansible.builtin.uri:
+    url: "http://{{ ubercookie_bind_host }}:{{ ubercookie_bind_port }}/api/health"
+    status_code: 200
+    return_content: true
+  register: ubercookie_health
+  retries: 6
+  delay: 2
+  until: ubercookie_health.status == 200

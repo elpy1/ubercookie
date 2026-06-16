@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -o nounset -o errexit -o pipefail
+
+dry_run=0
+if [[ "${1:-}" == "--dry-run" ]]; then
+    dry_run=1
+    shift
+fi
+
+if [[ "$#" -ne 0 ]]; then
+    echo "usage: $0 [--dry-run]" >&2
+    exit 64
+fi
+
+certbot_args=(
+    certonly
+    --dns-cloudflare
+    --dns-cloudflare-credentials
+    "{{ certbot_cloudflare_credentials }}"
+    --dns-cloudflare-propagation-seconds
+    "{{ certbot_cloudflare_propagation_seconds }}"
+    --cert-name
+    "{{ ubercookie_domain }}"
+    --email
+    "{{ letsencrypt_email }}"
+    --agree-tos
+    --non-interactive
+)
+
+if [[ "$dry_run" -eq 1 ]]; then
+    certbot_args+=(--dry-run)
+else
+    certbot_args+=(
+        --keep-until-expiring
+        --deploy-hook
+        "/usr/bin/bash -c 'if /usr/bin/systemctl is-active --quiet nginx; then /usr/bin/systemctl reload nginx; fi'"
+    )
+fi
+
+certbot_args+=(
+{% for domain in ubercookie_certificate_domains %}
+    -d
+    "{{ domain }}"
+{% endfor %}
+)
+
+exec "{{ certbot_venv_dir }}/bin/certbot" "${certbot_args[@]}"

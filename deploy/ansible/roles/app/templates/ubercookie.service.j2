@@ -1,0 +1,24 @@
+[Unit]
+Description=ubercookie FastAPI application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ ubercookie_run_user }}
+Group={{ ubercookie_run_group }}
+WorkingDirectory={{ ubercookie_app_dir }}/backend
+EnvironmentFile={{ ubercookie_env_file }}
+ExecStart={{ ubercookie_venv_dir }}/bin/uvicorn app.main:app --host {{ ubercookie_bind_host }} --port {{ ubercookie_bind_port }} --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3
+StateDirectory=ubercookie
+StateDirectoryMode=0750
+ReadWritePaths={{ ubercookie_data_dir }}
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

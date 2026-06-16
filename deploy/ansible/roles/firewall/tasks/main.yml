@@ -1,0 +1,254 @@
+---
+- name: Check generic web service firewall rules
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--query-service={{ item }}"
+  changed_when: false
+  failed_when: false
+  register: firewall_generic_services
+  loop:
+    - http
+    - https
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+
+- name: Remove generic web service firewall rules
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--remove-service={{ item.item }}"
+  loop: "{{ firewall_generic_services.results | default([]) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - item.rc == 0
+  notify: Reload firewalld
+
+- name: Check configured firewalld ipsets
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - --get-ipsets
+  changed_when: false
+  register: firewalld_ipsets
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+
+- name: Create Cloudflare IPv4 firewalld ipset
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--new-ipset={{ ubercookie_firewall_cloudflare_ipv4_ipset }}"
+      - --type=hash:net
+      - --option=family=inet
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+    - ubercookie_firewall_cloudflare_ipv4_ipset not in firewalld_ipsets.stdout.split()
+  notify: Reload firewalld
+
+- name: Create Cloudflare IPv6 firewalld ipset
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--new-ipset={{ ubercookie_firewall_cloudflare_ipv6_ipset }}"
+      - --type=hash:net
+      - --option=family=inet6
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+    - ubercookie_cloudflare_ipv6_enabled | bool
+    - ubercookie_firewall_cloudflare_ipv6_ipset not in firewalld_ipsets.stdout.split()
+  notify: Reload firewalld
+
+- name: Read Cloudflare IPv4 ipset entries
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--ipset={{ ubercookie_firewall_cloudflare_ipv4_ipset }}"
+      - --get-entries
+  changed_when: false
+  register: firewalld_ipv4_ipset_entries
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+
+- name: Add missing Cloudflare IPv4 ipset entries
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--ipset={{ ubercookie_firewall_cloudflare_ipv4_ipset }}"
+      - "--add-entry={{ item }}"
+  loop: "{{ cloudflare_ipv4_cidrs | difference(firewalld_ipv4_ipset_entries.stdout_lines | default([])) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+  notify: Reload firewalld
+
+- name: Remove stale Cloudflare IPv4 ipset entries
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--ipset={{ ubercookie_firewall_cloudflare_ipv4_ipset }}"
+      - "--remove-entry={{ item }}"
+  loop: "{{ (firewalld_ipv4_ipset_entries.stdout_lines | default([])) | difference(cloudflare_ipv4_cidrs) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+  notify: Reload firewalld
+
+- name: Read Cloudflare IPv6 ipset entries
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--ipset={{ ubercookie_firewall_cloudflare_ipv6_ipset }}"
+      - --get-entries
+  changed_when: false
+  register: firewalld_ipv6_ipset_entries
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+    - ubercookie_cloudflare_ipv6_enabled | bool
+
+- name: Add missing Cloudflare IPv6 ipset entries
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--ipset={{ ubercookie_firewall_cloudflare_ipv6_ipset }}"
+      - "--add-entry={{ item }}"
+  loop: "{{ cloudflare_ipv6_cidrs | difference(firewalld_ipv6_ipset_entries.stdout_lines | default([])) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+    - ubercookie_cloudflare_ipv6_enabled | bool
+  notify: Reload firewalld
+
+- name: Remove stale Cloudflare IPv6 ipset entries
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--ipset={{ ubercookie_firewall_cloudflare_ipv6_ipset }}"
+      - "--remove-entry={{ item }}"
+  loop: "{{ (firewalld_ipv6_ipset_entries.stdout_lines | default([])) | difference(cloudflare_ipv6_cidrs) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+    - ubercookie_cloudflare_ipv6_enabled | bool
+  notify: Reload firewalld
+
+- name: Build Cloudflare IPv4 ipset firewalld rules
+  ansible.builtin.set_fact:
+    cloudflare_firewalld_rules: "{{ (cloudflare_firewalld_rules | default([])) + ['rule family=\"ipv4\" source ipset=\"' ~ ubercookie_firewall_cloudflare_ipv4_ipset ~ '\" port port=\"' ~ item ~ '\" protocol=\"tcp\" accept'] }}"
+  loop: "{{ ubercookie_firewall_web_ports }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+
+- name: Build Cloudflare IPv6 ipset firewalld rules
+  ansible.builtin.set_fact:
+    cloudflare_firewalld_rules: "{{ (cloudflare_firewalld_rules | default([])) + ['rule family=\"ipv6\" source ipset=\"' ~ ubercookie_firewall_cloudflare_ipv6_ipset ~ '\" port port=\"' ~ item ~ '\" protocol=\"tcp\" accept'] }}"
+  loop: "{{ ubercookie_firewall_web_ports }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - ubercookie_firewall_use_ipsets | bool
+    - ubercookie_cloudflare_ipv6_enabled | bool
+
+- name: Build Cloudflare IPv4 per-CIDR firewalld rules
+  ansible.builtin.set_fact:
+    cloudflare_firewalld_rules: "{{ (cloudflare_firewalld_rules | default([])) + ['rule family=\"ipv4\" source address=\"' ~ item.0 ~ '\" port port=\"' ~ item.1 ~ '\" protocol=\"tcp\" accept'] }}"
+  loop: "{{ cloudflare_ipv4_cidrs | product(ubercookie_firewall_web_ports) | list }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - not ubercookie_firewall_use_ipsets | bool
+
+- name: Build Cloudflare IPv6 per-CIDR firewalld rules
+  ansible.builtin.set_fact:
+    cloudflare_firewalld_rules: "{{ (cloudflare_firewalld_rules | default([])) + ['rule family=\"ipv6\" source address=\"' ~ item.0 ~ '\" port port=\"' ~ item.1 ~ '\" protocol=\"tcp\" accept'] }}"
+  loop: "{{ cloudflare_ipv6_cidrs | product(ubercookie_firewall_web_ports) | list }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - not ubercookie_firewall_use_ipsets | bool
+    - ubercookie_cloudflare_ipv6_enabled | bool
+
+- name: Check Cloudflare rich firewall rules
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--query-rich-rule={{ item }}"
+  changed_when: false
+  failed_when: false
+  register: firewall_cloudflare_rule_checks
+  loop: "{{ cloudflare_firewalld_rules | default([]) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+
+- name: Add Cloudflare rich firewall rules
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--add-rich-rule={{ item.item }}"
+  loop: "{{ firewall_cloudflare_rule_checks.results | default([]) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - ubercookie_firewall_cloudflare_only | bool
+    - item.rc != 0
+  notify: Reload firewalld
+
+- name: Check generic web service firewall rules when Cloudflare-only mode is disabled
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--query-service={{ item }}"
+  changed_when: false
+  failed_when: false
+  register: firewall_generic_open_checks
+  loop:
+    - http
+    - https
+  when:
+    - ubercookie_firewall_manage | bool
+    - not ubercookie_firewall_cloudflare_only | bool
+
+- name: Open generic web ports when Cloudflare-only mode is disabled
+  ansible.builtin.command:
+    argv:
+      - firewall-cmd
+      - --permanent
+      - "--add-service={{ item.item }}"
+  loop: "{{ firewall_generic_open_checks.results | default([]) }}"
+  when:
+    - ubercookie_firewall_manage | bool
+    - not ubercookie_firewall_cloudflare_only | bool
+    - item.rc != 0
+  notify: Reload firewalld

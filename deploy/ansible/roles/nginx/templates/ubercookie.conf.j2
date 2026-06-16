@@ -1,0 +1,116 @@
+# Managed by Ansible.
+upstream ubercookie_backend {
+    server {{ ubercookie_bind_host }}:{{ ubercookie_bind_port }};
+    keepalive 16;
+}
+
+{% if ubercookie_redirect_hosts | length > 0 %}
+server {
+    listen 80;
+{% if nginx_listen_ipv6 | bool %}
+    listen [::]:80;
+{% endif %}
+    server_name {{ ubercookie_redirect_hosts | join(' ') }};
+
+    include /etc/nginx/snippets/cloudflare-only.conf;
+
+    access_log {{ nginx_access_log }} cloudflare_main;
+    error_log {{ nginx_error_log }} warn;
+
+    return 301 https://{{ ubercookie_canonical_host }}$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+{% if nginx_listen_ipv6 | bool %}
+    listen [::]:443 ssl http2;
+{% endif %}
+    server_name {{ ubercookie_redirect_hosts | join(' ') }};
+
+    include /etc/nginx/snippets/cloudflare-only.conf;
+    include /etc/nginx/snippets/ssl-params.conf;
+
+    ssl_certificate /etc/letsencrypt/live/{{ ubercookie_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ ubercookie_domain }}/privkey.pem;
+
+    access_log {{ nginx_access_log }} cloudflare_main;
+    error_log {{ nginx_error_log }} warn;
+
+    return 301 https://{{ ubercookie_canonical_host }}$request_uri;
+}
+{% endif %}
+
+server {
+    listen 80;
+{% if nginx_listen_ipv6 | bool %}
+    listen [::]:80;
+{% endif %}
+    server_name {{ ubercookie_canonical_host }};
+
+    include /etc/nginx/snippets/cloudflare-only.conf;
+
+    access_log {{ nginx_access_log }} cloudflare_main;
+    error_log {{ nginx_error_log }} warn;
+
+    return 301 https://{{ ubercookie_canonical_host }}$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+{% if nginx_listen_ipv6 | bool %}
+    listen [::]:443 ssl http2;
+{% endif %}
+    server_name {{ ubercookie_canonical_host }};
+
+    include /etc/nginx/snippets/cloudflare-only.conf;
+    include /etc/nginx/snippets/ssl-params.conf;
+
+    ssl_certificate /etc/letsencrypt/live/{{ ubercookie_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ ubercookie_domain }}/privkey.pem;
+
+    access_log {{ nginx_access_log }} cloudflare_main;
+    error_log {{ nginx_error_log }} warn;
+
+    client_max_body_size 1m;
+
+    location /api/ {
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+
+    location /assets/ {
+        add_header Cache-Control "{{ nginx_static_asset_cache_control }}" always;
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+
+    location = /favicon.svg {
+        add_header Cache-Control "{{ nginx_favicon_cache_control }}" always;
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+
+    location = /sw.js {
+        add_header Cache-Control "{{ nginx_service_worker_cache_control }}" always;
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "{{ nginx_html_cache_control }}" always;
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+
+    location = / {
+        add_header Cache-Control "{{ nginx_html_cache_control }}" always;
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+
+    location / {
+        add_header Cache-Control "{{ nginx_html_cache_control }}" always;
+        include /etc/nginx/snippets/ubercookie-proxy-headers.conf;
+        proxy_pass http://ubercookie_backend;
+    }
+}

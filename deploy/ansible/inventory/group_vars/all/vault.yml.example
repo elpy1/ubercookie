@@ -1,0 +1,5 @@
+---
+# Copy to inventory/group_vars/all/vault.yml and encrypt with ansible-vault, or
+# pass these values with --extra-vars / environment variables when running.
+letsencrypt_email: admin@example.com
+cloudflare_api_token: replace-with-cloudflare-dns-api-token

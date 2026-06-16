@@ -1,0 +1,86 @@
+---
+- name: Create certbot virtual environment
+  ansible.builtin.command:
+    argv:
+      - "{{ ubercookie_python_bin }}"
+      - -m
+      - venv
+      - "{{ certbot_venv_dir }}"
+    creates: "{{ certbot_venv_dir }}/bin/python"
+
+- name: Install certbot with Cloudflare DNS plugin
+  ansible.builtin.pip:
+    executable: "{{ certbot_venv_dir }}/bin/pip"
+    name:
+      - certbot
+      - "certbot-dns-cloudflare=={{ certbot_dns_cloudflare_version }}"
+    state: present
+
+- name: Create Let's Encrypt directory
+  ansible.builtin.file:
+    path: /etc/letsencrypt
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Cloudflare credentials
+  ansible.builtin.template:
+    src: cloudflare.ini.j2
+    dest: "{{ certbot_cloudflare_credentials }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install site-specific certbot renewal script
+  ansible.builtin.template:
+    src: ubercookie-certbot-renew.j2
+    dest: "{{ certbot_renew_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Dry-run certificate request through Cloudflare DNS
+  ansible.builtin.command:
+    argv:
+      - "{{ certbot_renew_script }}"
+      - --dry-run
+  changed_when: false
+  when: certbot_test_before_issue | bool
+
+- name: Request or renew certificate through Cloudflare DNS
+  ansible.builtin.command:
+    argv:
+      - "{{ certbot_renew_script }}"
+  register: certbot_issue
+  changed_when: >-
+    'Successfully received certificate' in certbot_issue.stdout or
+    'Congratulations!' in certbot_issue.stdout
+
+- name: Install certbot renewal service
+  ansible.builtin.template:
+    src: certbot-renew.service.j2
+    dest: "/etc/systemd/system/{{ certbot_renew_unit_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install certbot renewal timer
+  ansible.builtin.template:
+    src: certbot-renew.timer.j2
+    dest: "/etc/systemd/system/{{ certbot_renew_unit_name }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Flush certbot handlers before enabling timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable certbot renewal timer
+  ansible.builtin.systemd:
+    name: "{{ certbot_renew_unit_name }}.timer"
+    enabled: true
+    state: started

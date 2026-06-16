@@ -1,0 +1,10 @@
+# Managed by Ansible.
+geo $realip_remote_addr $ubercookie_from_cloudflare {
+    default 0;
+{% for cidr in cloudflare_ipv4_cidrs %}
+    {{ cidr }} 1;
+{% endfor %}
+{% for cidr in cloudflare_ipv6_cidrs %}
+    {{ cidr }} 1;
+{% endfor %}
+}
