@@ -7,7 +7,7 @@ and verifies the *server* logic; real cache behaviour is exercised in a browser.
 
 from fastapi.testclient import TestClient
 
-from app import config
+from app import config, store
 from app.main import app
 
 client = TestClient(app)
@@ -34,6 +34,15 @@ def test_repeat_visit_increments_count():
     r2 = client.post("/api/visit", json={"id": HEX, "recovered_from": ["localStorage"]})
     assert r2.json()["visit_count"] == 2
     assert r2.json()["minted_now"] is False
+
+
+def test_sqlite_tuning_is_enabled():
+    conn = store._connect()
+    try:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+        assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == config.SQLITE_BUSY_TIMEOUT_MS
+    finally:
+        conn.close()
 
 
 def test_invalid_id_is_rejected_and_minted_fresh():

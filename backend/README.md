@@ -42,3 +42,5 @@ uv run pytest
 | `GIGACOOKIE_COOKIE_MAX_AGE` | `31536000`          | Cookie lifetime (seconds)                 |
 | `GIGACOOKIE_CORS_ORIGINS` | _(empty)_             | Comma-separated origins for cross-origin dev |
 | `GIGACOOKIE_FRONTEND_DIST`| `frontend/dist`       | Built frontend to serve at `/`            |
+| `GIGACOOKIE_SQLITE_TIMEOUT` | `10`                | SQLite connection timeout (seconds)       |
+| `GIGACOOKIE_SQLITE_BUSY_TIMEOUT_MS` | `10000`     | SQLite lock wait timeout (milliseconds)   |

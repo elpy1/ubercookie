@@ -10,6 +10,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("GIGACOOKIE_DATA_DIR", BASE_DIR / "data"))
 DB_PATH = DATA_DIR / "ubercookie.sqlite3"
 
+# SQLite remains intentionally simple for this demo. WAL lets readers continue
+# during short writes, and the busy timeout gives concurrent workers a brief
+# window to wait instead of failing immediately with "database is locked".
+SQLITE_TIMEOUT_SECONDS = float(os.environ.get("GIGACOOKIE_SQLITE_TIMEOUT", "10"))
+SQLITE_BUSY_TIMEOUT_MS = int(
+    os.environ.get(
+        "GIGACOOKIE_SQLITE_BUSY_TIMEOUT_MS",
+        str(int(SQLITE_TIMEOUT_SECONDS * 1000)),
+    )
+)
+
 # Name of the server-set (HttpOnly) cookie vector.
 COOKIE_NAME = os.environ.get("GIGACOOKIE_COOKIE", "gid")
 

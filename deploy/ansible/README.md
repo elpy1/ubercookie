@@ -3,6 +3,8 @@
 This playbook deploys ubercookie to a server behind Cloudflare:
 
 - FastAPI runs locally on `127.0.0.1:8000` as the `ubercookie` system user.
+- Uvicorn starts with two workers by default; tune `ubercookie_uvicorn_workers`
+  for larger or smaller servers.
 - nginx terminates HTTPS and proxies the app.
 - nginx treats `ubercookie.xyz` as canonical and 301-redirects `www.ubercookie.xyz` to the apex.
 - Certbot uses DNS-01 through Cloudflare with `certbot-dns-cloudflare==4.2.0`.
@@ -63,3 +65,7 @@ Cloudflare IPv4 ranges are fetched on each run and rendered into nginx plus a fi
 The vhost config is at `/etc/nginx/sites-available/ubercookie.xyz.conf` and enabled through `/etc/nginx/sites-enabled/`.
 
 HSTS is disabled for now (`nginx_hsts_max_age: 0`) so it does not accidentally become part of the demo before the HSTS supercookie idea is designed deliberately.
+
+The app uses SQLite in WAL mode with a 10 second busy timeout by default. Tune
+`ubercookie_sqlite_timeout_seconds` and `ubercookie_sqlite_busy_timeout_ms` if
+the origin sees short write bursts.

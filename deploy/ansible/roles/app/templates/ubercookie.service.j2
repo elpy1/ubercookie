@@ -9,7 +9,7 @@ User={{ ubercookie_run_user }}
 Group={{ ubercookie_run_group }}
 WorkingDirectory={{ ubercookie_app_dir }}/backend
 EnvironmentFile={{ ubercookie_env_file }}
-ExecStart={{ ubercookie_venv_dir }}/bin/uvicorn app.main:app --host {{ ubercookie_bind_host }} --port {{ ubercookie_bind_port }} --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart={{ ubercookie_venv_dir }}/bin/uvicorn app.main:app --host {{ ubercookie_bind_host }} --port {{ ubercookie_bind_port }} --workers {{ ubercookie_uvicorn_workers }} --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=3
 StateDirectory=ubercookie

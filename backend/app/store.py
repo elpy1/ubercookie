@@ -25,8 +25,8 @@ def lastmod_token(id: str) -> int:
     """
     return zlib.crc32(id.encode()) & 0xFFFFFFFF
 
-# SQLite is happy with one writer; a process-wide lock keeps the demo simple and
-# avoids "database is locked" under concurrent requests.
+# SQLite is happy with one writer. This lock prevents same-process write races;
+# WAL and busy_timeout handle short contention across Uvicorn workers.
 _lock = threading.Lock()
 
 
@@ -36,7 +36,9 @@ def _now() -> str:
 
 def _connect() -> sqlite3.Connection:
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = sqlite3.connect(config.DB_PATH, timeout=config.SQLITE_TIMEOUT_SECONDS)
+    conn.execute(f"PRAGMA busy_timeout = {config.SQLITE_BUSY_TIMEOUT_MS}")
+    conn.execute("PRAGMA synchronous = NORMAL")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -46,6 +48,7 @@ def init() -> None:
     with _lock:
         conn = _connect()
         try:
+            conn.execute("PRAGMA journal_mode = WAL")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS browsers (

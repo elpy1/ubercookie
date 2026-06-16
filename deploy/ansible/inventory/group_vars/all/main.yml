@@ -32,10 +32,13 @@ ubercookie_nodejs_stream: "20"
 
 ubercookie_bind_host: 127.0.0.1
 ubercookie_bind_port: 8000
+ubercookie_uvicorn_workers: 2
 ubercookie_cookie_name: gid
 ubercookie_cookie_secure: "1"
 ubercookie_cookie_max_age: 31536000
 ubercookie_frontend_dist: "{{ ubercookie_app_dir }}/frontend/dist"
+ubercookie_sqlite_timeout_seconds: 10
+ubercookie_sqlite_busy_timeout_ms: 10000
 
 certbot_venv_dir: /opt/certbot-cloudflare
 certbot_cloudflare_credentials: /etc/letsencrypt/cloudflare.ini
