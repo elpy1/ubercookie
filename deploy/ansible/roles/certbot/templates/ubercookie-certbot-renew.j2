@@ -32,6 +32,7 @@ if [[ "$dry_run" -eq 1 ]]; then
 else
     certbot_args+=(
         --keep-until-expiring
+        --expand
         --deploy-hook
         "/usr/bin/bash -c 'if /usr/bin/systemctl is-active --quiet nginx; then /usr/bin/systemctl reload nginx; fi'"
     )

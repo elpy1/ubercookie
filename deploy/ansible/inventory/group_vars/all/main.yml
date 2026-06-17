@@ -5,7 +5,9 @@ ubercookie_server_names:
   - ubercookie.xyz
   - www.ubercookie.xyz
 ubercookie_redirect_hosts: "{{ ubercookie_server_names | difference([ubercookie_canonical_host]) }}"
-ubercookie_certificate_domains: "{{ ubercookie_server_names }}"
+ubercookie_certificate_domains:
+  - "{{ ubercookie_domain }}"
+  - "*.{{ ubercookie_domain }}"
 ubercookie_cloudflare_ipv6_enabled: false
 
 # Set these in deploy/ansible/inventory/group_vars/all/vault.yml, with

@@ -146,7 +146,7 @@ function header() {
       h(
         'div',
         { class: 'social-links' },
-        profileLink('GitHub', 'https://github.com/elpy1', svgIcon('github')),
+        profileLink('GitHub', 'https://github.com/elpy1/ubercookie', svgIcon('github')),
         profileLink('X', 'https://x.com/itselpy', svgIcon('x')),
       ),
     ),
